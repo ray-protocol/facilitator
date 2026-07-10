@@ -7,8 +7,15 @@ import type { Env } from "../env";
 import type { EvmNetwork } from "../lib/network/evm";
 import { internalServerError } from "../errors";
 import { createEvmWalletClient, EVM_NETWORKS } from "../lib/network/evm";
+import {
+  registerErc20ApprovalGasSponsoringExtension,
+  registerErc2612GasSponsoringExtension,
+} from "../lib/x402/extensions";
 import { registerEvmExactScheme, registerEvmUptoScheme } from "../lib/x402/scheme";
-import { createEvmFacilitatorSigner } from "../lib/x402/signer";
+import {
+  createErc20ApprovalGasSponsoringSigner,
+  createEvmFacilitatorSigner,
+} from "../lib/x402/signer";
 
 export type X402FacilitatorClientVariables = {
   X402_FACILITATOR: x402Facilitator;
@@ -34,18 +41,44 @@ export const x402FacilitatorClient = () =>
       return c.json(internalServerError, 500);
     }
 
-    const signer = privateKeyToAccount(privateKey);
+    const account = privateKeyToAccount(privateKey);
 
-    for (const network of EVM_NETWORKS) {
-      const rpcUrlKey = RPC_URL_BY_NETWORK[network];
-      const rpcUrl = c.env[rpcUrlKey];
+    const walletClients = new Map(
+      EVM_NETWORKS.map((network) => {
+        const rpcUrlKey = RPC_URL_BY_NETWORK[network];
+        const rpcUrl = c.env[rpcUrlKey];
 
-      const evmWalletClient = createEvmWalletClient(network, signer, rpcUrl || undefined);
-      const evmFacilitatorSigner = createEvmFacilitatorSigner(evmWalletClient);
+        const walletClient = createEvmWalletClient(network, account, rpcUrl || undefined);
 
-      registerEvmExactScheme(network, evmFacilitatorSigner, facilitatorClient);
-      registerEvmUptoScheme(network, evmFacilitatorSigner, facilitatorClient);
-    }
+        return [network, walletClient];
+      })
+    );
+
+    // Register scheme
+    EVM_NETWORKS.forEach((network) => {
+      const walletClient = walletClients.get(network);
+      if (!walletClient) return;
+
+      const facilitatorSigner = createEvmFacilitatorSigner(walletClient);
+
+      registerEvmExactScheme(network, facilitatorSigner, facilitatorClient);
+      registerEvmUptoScheme(network, facilitatorSigner, facilitatorClient);
+    });
+
+    // Register extension
+    registerErc2612GasSponsoringExtension(facilitatorClient);
+    registerErc20ApprovalGasSponsoringExtension((network) => {
+      const walletClient = walletClients.get(network);
+      if (!walletClient) return null;
+
+      const facilitatorSigner = createEvmFacilitatorSigner(walletClient);
+      const erc20ApprovalGasSponsoringSigner = createErc20ApprovalGasSponsoringSigner(
+        facilitatorSigner,
+        walletClient
+      );
+
+      return erc20ApprovalGasSponsoringSigner;
+    }, facilitatorClient);
 
     c.set("X402_FACILITATOR", facilitatorClient);
 

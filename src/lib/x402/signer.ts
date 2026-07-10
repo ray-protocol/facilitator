@@ -1,3 +1,4 @@
+import type { FacilitatorEvmSigner } from "@x402/evm";
 import type { Erc20ApprovalGasSponsoringSigner, TransactionRequest } from "@x402/extensions";
 import type { VerifyTypedDataParameters } from "viem";
 import { toFacilitatorEvmSigner } from "@x402/evm";
@@ -47,10 +48,9 @@ export const createEvmFacilitatorSigner = (client: EvmWalletClient) =>
   });
 
 export const createErc20ApprovalGasSponsoringSigner = (
+  signer: FacilitatorEvmSigner,
   client: EvmWalletClient
 ): Erc20ApprovalGasSponsoringSigner => {
-  const signer = createEvmFacilitatorSigner(client);
-
   return {
     ...signer,
     sendTransactions: async (transactions: TransactionRequest[]) => {
