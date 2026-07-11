@@ -11,7 +11,11 @@ import {
   registerErc20ApprovalGasSponsoringExtension,
   registerErc2612GasSponsoringExtension,
 } from "../lib/x402/extensions";
-import { registerEvmExactScheme, registerEvmUptoScheme } from "../lib/x402/scheme";
+import {
+  registerEvmBatchSettlementScheme,
+  registerEvmExactScheme,
+  registerEvmUptoScheme,
+} from "../lib/x402/scheme";
 import {
   createErc20ApprovalGasSponsoringSigner,
   createEvmFacilitatorSigner,
@@ -63,6 +67,7 @@ export const x402FacilitatorClient = () =>
 
       registerEvmExactScheme(network, facilitatorSigner, facilitatorClient);
       registerEvmUptoScheme(network, facilitatorSigner, facilitatorClient);
+      registerEvmBatchSettlementScheme(network, facilitatorSigner, facilitatorClient);
     });
 
     // Register extension
